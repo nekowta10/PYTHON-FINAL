@@ -1,0 +1,512 @@
+{% extends 'my_app/base_dashboard.html' %}
+
+{% block title %}Teacher Dashboard · Survey Hub{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+    .analytics-card {
+        margin-top: 24px;
+    }
+    .response-analytics {
+        display: grid;
+        gap: 24px;
+        grid-template-columns: repeat(2, 1fr);
+    }
+    @media (max-width: 768px) {
+        .response-analytics {
+            grid-template-columns: 1fr;
+        }
+    }
+    .response-section {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .word-cloud {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: flex-start;
+        min-height: 120px;
+    }
+    .word-cloud span {
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+    .word-cloud-item {
+        font-size: 0.7rem;
+    }
+    canvas {
+        width: 100% !important;
+        height: 300px !important;
+        max-height: 300px;
+    }
+    #mcq-chart {
+        max-height: 350px !important;
+        height: 350px !important;
+    }
+    .response-section {
+        min-height: 350px;
+    }
+    .response-section strong {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        margin-bottom: 8px;
+        display: block;
+    }
+    .empty-state.small {
+        padding: 12px;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block sidebar_nav %}
+    <a class="sidebar-link {% if active_section == 'overview' %}active{% endif %}" href="{% url 'teacher_dashboard' %}?section=overview">
+        {% include 'my_app/partials/nav_icon.html' with name='home' %}
+        <span class="nav-label">Overview</span>
+    </a>
+    <a class="sidebar-link {% if active_section == 'manage' %}active{% endif %}" href="{% url 'teacher_dashboard' %}?section=manage">
+        {% include 'my_app/partials/nav_icon.html' with name='clipboard' %}
+        <span class="nav-label">Manage Surveys</span>
+    </a>
+    <a class="sidebar-link" href="{% url 'all_users' %}">
+        {% include 'my_app/partials/nav_icon.html' with name='users' %}
+        <span class="nav-label">Students</span>
+    </a>
+{% endblock %}
+
+{% block page_title %}
+    {% if active_section == 'manage' %}
+        Teacher Workspace
+        <small>Design, assign, and analyse your surveys.</small>
+    {% else %}
+        Teacher Overview
+        <small>Review survey performance and insights.</small>
+    {% endif %}
+{% endblock %}
+
+{% block topbar_actions %}
+    <span class="badge">
+        {{ user.get_full_name|default:user.username }}
+    </span>
+    {% if active_section == 'manage' %}
+        <a href="/survey/create/" class="btn-primary">＋ Create Survey</a>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {% if active_section == 'overview' %}
+        <div class="grid grid-cols-3">
+            <div class="card">
+                <div class="card-header">
+                    Total Surveys
+                </div>
+                <div class="value-highlight">{{ total_surveys }}</div>
+                <div class="muted">Surveys created by you.</div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    Total Responses
+                </div>
+                <div class="value-highlight">{{ total_responses }}</div>
+                <div class="muted">Collected across all surveys.</div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    Latest Activity
+                </div>
+                {% with latest=surveys|first %}
+                    {% if latest %}
+                        <div class="muted">
+                            Last created: {{ latest.created_at|date:"M d, Y" }}
+                        </div>
+                    {% else %}
+                        <div class="muted">No activity yet.</div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        <div class="card analytics-card">
+            <div class="card-header">
+                Response Insights
+            </div>
+            <div class="response-analytics">
+                <div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                    <label for="analytics-survey-select" style="font-weight: 600;">Survey:</label>
+                    <select id="analytics-survey-select" class="form-select" style="min-width: 220px; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(148,163,184,0.4);">
+                        <option value="">All</option>
+                        {% for survey in analytics_surveys %}
+                            <option value="{{ survey.id }}" {% if survey_meta.id == survey.id %}selected{% endif %}>
+                                {{ survey.title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <span style="font-size: 0.9rem; color: var(--text-muted);">
+                        <strong id="analytics-survey-label">{{ survey_meta.title|default:'All Surveys' }}</strong>
+                    </span>
+                </div>
+                <div class="response-section">
+                    <strong>MCQ</strong>
+                    <canvas id="mcq-chart"></canvas>
+                    <div id="mcq-empty" class="empty-state small" {% if mcq_chart_data.labels %}style="display: none;"{% endif %}>
+                        No data
+                    </div>
+                </div>
+                <div class="response-section">
+                    <strong>Likert</strong>
+                    <canvas id="likert-chart"></canvas>
+                    <div id="likert-empty" class="empty-state small" {% if likert_chart_data.labels %}style="display: none;"{% endif %}>
+                        No data
+                    </div>
+                </div>
+                <div class="response-section" style="grid-column: 1 / -1; margin-top: 8px;">
+                    <strong>Word Cloud</strong>
+                    <div id="word-cloud" class="word-cloud">
+                        {% for token in word_cloud_data %}
+                            <span class="word-cloud-item" data-weight="{{ token.weight }}" title="{{ token.count }} mentions">{{ token.word }}</span>
+                        {% endfor %}
+                    </div>
+                    <div id="word-cloud-empty" class="empty-state small" {% if word_cloud_data %}style="display:none;"{% endif %}>
+                        No data
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if active_section == 'manage' %}
+        <div class="card">
+            <div class="card-header">
+                Your Surveys
+                <span class="badge">{{ surveys|length }} active</span>
+            </div>
+
+            {% if surveys %}
+                <div class="list">
+                    {% for survey in surveys %}
+                        <div class="list-item">
+                            <div>
+                                <h4>{{ survey.title }}</h4>
+                                <p>
+                                    Sections:
+                                    {% if survey.assigned_sections.all %}
+                                        {% for section in survey.assigned_sections.all %}
+                                            {{ section.name }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% else %}
+                                        All sections
+                                    {% endif %}
+                                    · Due: {{ survey.due_date|date:"M d, Y"|default:"No deadline" }}
+                                </p>
+                                <p class="muted">
+                                    Type:
+                                    {% if survey.survey_type %}
+                                        {{ survey.get_survey_type_display }}
+                                    {% else %}
+                                        Not set
+                                    {% endif %}
+                                </p>
+                                <p class="muted">
+                                    Responses: {{ survey.responses.count }}
+                                </p>
+                            </div>
+                            <div class="topbar-actions">
+                                <a href="{% url 'edit_survey' survey.id %}" class="btn-primary" style="padding: 10px 14px;">Edit</a>
+                                <a href="{% url 'survey_responses' survey.id %}" class="btn-primary" style="padding: 10px 14px; background: #7c3aed;">View</a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    You haven't created any surveys yet.
+                    <div style="margin-top: 16px;">
+                        <a href="/survey/create/" class="btn-primary">Plan your first survey</a>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+    {{ mcq_chart_data|json_script:"mcq-chart-data" }}
+    {{ likert_chart_data|json_script:"likert-chart-data" }}
+    {{ word_cloud_data|json_script:"word-cloud-data" }}
+    {{ survey_meta|json_script:"analytics-meta" }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const pieColors = ['#4f46e5', '#7c3aed', '#6366f1', '#10b981', '#f97316', '#f43f5e', '#14b8a6', '#facc15'];
+            const analyticsEndpoint = "{% url 'dashboard_analytics' %}";
+            const initialMcq = JSON.parse(document.getElementById('mcq-chart-data').textContent);
+            const initialLikert = JSON.parse(document.getElementById('likert-chart-data').textContent);
+            const initialWordCloud = JSON.parse(document.getElementById('word-cloud-data').textContent);
+            const initialMeta = JSON.parse(document.getElementById('analytics-meta').textContent);
+            const mcqEmpty = document.getElementById('mcq-empty');
+            const likertEmpty = document.getElementById('likert-empty');
+            const wordCloudEmpty = document.getElementById('word-cloud-empty');
+            const wordCloudContainer = document.getElementById('word-cloud');
+            const surveySelect = document.getElementById('analytics-survey-select');
+            const surveyLabel = document.getElementById('analytics-survey-label');
+            let mcqChart, likertChart;
+            let currentSurveyId = initialMeta.id || '';
+
+            const getColors = (length) => Array.from({ length }, (_, idx) => pieColors[idx % pieColors.length]);
+            
+            const renderPie = (canvasId, data, emptyEl, label) => {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                if (!data.labels.length) {
+                    if (canvas._chartInstance) {
+                        canvas._chartInstance.destroy();
+                        canvas._chartInstance = null;
+                    }
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+                emptyEl.style.display = 'none';
+                const colors = getColors(data.labels.length);
+                if (!canvas._chartInstance) {
+                    canvas._chartInstance = new Chart(canvas, {
+                        type: 'pie',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label,
+                                data: data.values,
+                                backgroundColor: colors,
+                                borderColor: '#ffffff',
+                                borderWidth: 3,
+                                hoverBorderWidth: 4,
+                                hoverOffset: 8,
+                            }],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { 
+                                        boxWidth: 14,
+                                        boxHeight: 14,
+                                        padding: 12,
+                                        font: {
+                                            size: 12,
+                                            weight: '500',
+                                            family: "'Inter', 'Segoe UI', sans-serif"
+                                        },
+                                        color: '#1f2937',
+                                        usePointStyle: true,
+                                        pointStyle: 'circle'
+                                    },
+                                    align: 'center',
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                    padding: 14,
+                                    titleFont: {
+                                        size: 13,
+                                        weight: '600',
+                                        family: "'Inter', 'Segoe UI', sans-serif"
+                                    },
+                                    bodyFont: {
+                                        size: 13,
+                                        weight: '500',
+                                        family: "'Inter', 'Segoe UI', sans-serif"
+                                    },
+                                    cornerRadius: 10,
+                                    displayColors: true,
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.parsed || 0;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = ((value / total) * 100).toFixed(1);
+                                            return `${label}: ${value} (${percentage}%)`;
+                                        }
+                                    }
+                                },
+                            },
+                            animation: {
+                                animateRotate: true,
+                                animateScale: true,
+                                duration: 1000,
+                                easing: 'easeOutQuart'
+                            },
+                            interaction: {
+                                intersect: false,
+                                mode: 'nearest'
+                            }
+                        },
+                    });
+                } else {
+                    canvas._chartInstance.data.labels = data.labels;
+                    canvas._chartInstance.data.datasets[0].data = data.values;
+                    canvas._chartInstance.data.datasets[0].backgroundColor = colors;
+                    canvas._chartInstance.update('active');
+                }
+            };
+
+            const renderBar = (canvasId, data, emptyEl, label) => {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+                if (!data.labels.length) {
+                    if (canvas._chartInstance) {
+                        canvas._chartInstance.destroy();
+                        canvas._chartInstance = null;
+                    }
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+                emptyEl.style.display = 'none';
+                const isLikertChart = canvasId === 'likert-chart';
+                if (!canvas._chartInstance) {
+                    canvas._chartInstance = new Chart(canvas, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label,
+                                data: data.values,
+                                backgroundColor: getColors(data.labels.length).map(c => c + 'CC'),
+                                borderColor: getColors(data.labels.length),
+                                borderWidth: 2,
+                                borderRadius: 8,
+                                borderSkipped: false,
+                            }],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            indexAxis: 'x',
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0,
+                                        font: {
+                                            size: 11,
+                                        },
+                                        color: '#64748b',
+                                    },
+                                    grid: {
+                                        color: 'rgba(148, 163, 184, 0.1)',
+                                    },
+                                },
+                                x: {
+                                    ticks: {
+                                        display: !isLikertChart,
+                                        font: {
+                                            size: 11,
+                                        },
+                                        color: '#64748b',
+                                        maxRotation: 45,
+                                        minRotation: 0,
+                                    },
+                                    grid: {
+                                        display: !isLikertChart,
+                                    },
+                                    border: {
+                                        display: !isLikertChart,
+                                    }
+                                },
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false,
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    padding: 12,
+                                    titleFont: {
+                                        size: 13,
+                                        weight: 'bold',
+                                    },
+                                    bodyFont: {
+                                        size: 12,
+                                    },
+                                    cornerRadius: 8,
+                                    displayColors: true,
+                                },
+                            },
+                        },
+                    });
+                } else {
+                    canvas._chartInstance.data.labels = data.labels;
+                    canvas._chartInstance.data.datasets[0].data = data.values;
+                    canvas._chartInstance.data.datasets[0].backgroundColor = getColors(data.labels.length).map(c => c + 'CC');
+                    canvas._chartInstance.data.datasets[0].borderColor = getColors(data.labels.length);
+                    canvas._chartInstance.options.scales.x.ticks.display = !isLikertChart;
+                    canvas._chartInstance.options.scales.x.grid.display = !isLikertChart;
+                    canvas._chartInstance.options.scales.x.border.display = !isLikertChart;
+                    canvas._chartInstance.update();
+                }
+            };
+
+            const renderWordCloud = (data) => {
+                if (!wordCloudContainer) return;
+                if (!data.length) {
+                    wordCloudContainer.innerHTML = '';
+                    wordCloudEmpty.style.display = 'block';
+                    return;
+                }
+                wordCloudEmpty.style.display = 'none';
+                wordCloudContainer.innerHTML = '';
+                data.forEach(item => {
+                    const span = document.createElement('span');
+                    span.textContent = item.word;
+                    span.className = 'word-cloud-item';
+                    // Scale down the font size to make text smaller
+                    span.style.fontSize = `${(item.weight * 0.7).toFixed(2)}rem`;
+                    span.title = `${item.count} mentions`;
+                    wordCloudContainer.appendChild(span);
+                });
+            };
+
+            const updateCharts = (dataset) => {
+                renderPie('mcq-chart', dataset.mcq_chart_data, mcqEmpty, 'MCQ responses');
+                renderBar('likert-chart', dataset.likert_chart_data, likertEmpty, 'Likert responses');
+                renderWordCloud(dataset.word_cloud_data);
+                if (surveyLabel && dataset.survey_meta) {
+                    surveyLabel.textContent = dataset.survey_meta.title || 'All Surveys';
+                }
+            };
+
+            const fetchAnalytics = async () => {
+                try {
+                    const params = new URLSearchParams();
+                    if (currentSurveyId) {
+                        params.append('survey_id', currentSurveyId);
+                    }
+                    const response = await fetch(`${analyticsEndpoint}?${params.toString()}`, {
+                        headers: { 'Accept': 'application/json' },
+                    });
+                    if (!response.ok) throw new Error('Failed to fetch analytics');
+                    const data = await response.json();
+                    updateCharts(data);
+                } catch (error) {
+                    console.error('Analytics update failed:', error);
+                }
+            };
+
+            updateCharts({
+                mcq_chart_data: initialMcq,
+                likert_chart_data: initialLikert,
+                word_cloud_data: initialWordCloud,
+                survey_meta: initialMeta,
+            });
+            setInterval(fetchAnalytics, 30000);
+
+            if (surveySelect) {
+                surveySelect.addEventListener('change', () => {
+                    currentSurveyId = surveySelect.value;
+                    fetchAnalytics();
+                });
+            }
+        });
+    </script>
+{% endblock %}

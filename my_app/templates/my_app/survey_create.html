@@ -1,0 +1,1402 @@
+{% extends 'my_app/base_dashboard.html' %}
+
+{% block title %}Create Survey · Survey Hub{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<style>
+    .custom-dropdown {
+        position: relative;
+        width: 100%;
+        z-index: 100;
+    }
+    .dropdown-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: white;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: border 0.2s ease, box-shadow 0.2s ease;
+        min-height: 48px;   
+    }
+    .dropdown-toggle:hover {
+        border-color: var(--primary-color);
+    }
+    .dropdown-toggle.active {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+    }
+    .dropdown-text {
+        flex: 1;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+    }
+    .dropdown-text.placeholder {
+        color: var(--text-muted);
+    }
+    .dropdown-arrow {
+        color: var(--primary-color);
+        font-size: 0.75rem;
+        transition: transform 0.2s ease;
+        margin-left: 12px;
+    }
+    .dropdown-toggle.active .dropdown-arrow {
+        transform: rotate(180deg);
+    }
+    .dropdown-menu {
+        display: none;
+        position: absolute;
+        top: auto;
+        bottom: calc(100% + 6px);
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2);
+        z-index: 9999;
+    }
+    .dropdown-menu.show {
+        display: block;
+    }
+    .dropdown-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+    .dropdown-option:last-child {
+        border-bottom: none;
+    }
+    .dropdown-option:hover {
+        background: rgba(79, 70, 229, 0.05);
+    }
+    .dropdown-option input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: var(--primary-color);
+    }
+    .dropdown-option span {
+        flex: 1;
+        color: var(--text-dark);
+        font-size: 0.95rem;
+    }
+    .dropdown-menu.dropdown-top {
+        top: auto;
+        bottom: calc(100% + 8px);
+    }
+    .column-builder {
+        margin-top: 32px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    .columns-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    .questions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-height: 100px;
+        padding: 12px;
+        border-radius: 8px;
+        transition: background 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .questions-list:not(:empty) + #questions-empty {
+        display: none;
+    }
+    .questions-list.sortable-ghost {
+        background: rgba(79, 70, 229, 0.05);
+        border: 2px dashed var(--primary-color);
+        border-radius: 12px;
+        min-height: 80px;
+    }
+    .drop-indicator {
+        height: 4px;
+        background: var(--primary-color);
+        border-radius: 2px;
+        margin: 8px 0;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        pointer-events: none;
+    }
+    .drop-indicator.active {
+        opacity: 1;
+    }
+    .question-settings-toggle {
+        background: rgba(79, 70, 229, 0.08);
+        color: var(--primary-color);
+        border: 1.5px solid rgba(79, 70, 229, 0.2);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .question-settings-toggle:hover {
+        background: rgba(79, 70, 229, 0.15);
+        border-color: var(--primary-color);
+    }
+    .question-settings-toggle.active {
+        background: rgba(79, 70, 229, 0.15);
+        border-color: var(--primary-color);
+    }
+    .question-settings-content {
+        display: none;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .question-settings-content.show {
+        display: block;
+    }
+    .form-alert {
+        display: none;
+        margin-bottom: 16px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        background: rgba(248, 113, 113, 0.12);
+        color: #b91c1c;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    .form-alert.success {
+        border-color: rgba(16, 185, 129, 0.4);
+        background: rgba(16, 185, 129, 0.12);
+        color: #047857;
+    }
+    .question-card.error {
+        border-color: rgba(248, 113, 113, 0.5);
+        box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15);
+    }
+    .column-header {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .column-header input[type="text"] {
+        padding: 10px 14px;
+        border-radius: 10px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        font-size: 0.95rem;
+    }
+    .column-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .column-actions button {
+        border: none;
+        border-radius: 10px;
+        padding: 8px 12px;
+        background: rgba(79, 70, 229, 0.08);
+        color: #4f46e5;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .column-actions button.remove-column {
+        background: rgba(239, 68, 68, 0.12);
+        color: #dc2626;
+    }
+    .column-empty {
+        padding: 12px;
+        border-radius: 10px;
+        background: rgba(148, 163, 184, 0.15);
+        color: #475569;
+        font-size: 0.9rem;
+        text-align: center;
+    }
+    .column-questions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    body {
+        min-height: 100vh;
+    }
+    .main {
+        min-height: 100vh;
+    }
+    .card {
+        max-width: 1400px;
+        margin: 0 auto;
+        width: 100%;
+        padding: 32px;
+        min-height: calc(100vh - 200px);
+    }
+    .survey-form-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 32px;
+    }
+    .survey-info-wrapper {
+        width: 100%;
+        max-width: 100%;
+        position: relative;
+        z-index: 1;
+    }
+    .questions-builder {
+        width: 100%;
+        max-width: 100%;
+        position: relative;
+        z-index: 2;
+    }
+    .questions-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        align-items: start;
+        position: relative;
+    }
+    @media (min-width: 768px) {
+        .questions-list {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    @media (min-width: 1200px) {
+        .questions-list {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+    .questions-list .sortable-ghost {
+        opacity: 0.4;
+        background: rgba(79, 70, 229, 0.1);
+    }
+    .questions-list .sortable-drag {
+        opacity: 0.9;
+        transform: rotate(2deg);
+    }
+    .questions-list .sortable-chosen {
+        cursor: grabbing !important;
+    }
+    .question-card.sortable-ghost {
+        border: 2px dashed var(--primary-color);
+    }
+    .question-card {
+        border: 2px solid rgba(148, 163, 184, 0.3);
+        border-radius: 16px;
+        padding: 20px;
+        background: white;
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform, opacity;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .question-card:hover {
+        border-color: var(--primary-color);
+        box-shadow: 0 8px 24px rgba(79, 70, 229, 0.15);
+        transform: translateY(-3px);
+        background: rgba(79, 70, 229, 0.02);
+    }
+    .question-card-header {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .question-card-drag-handle {
+        color: var(--primary-color);
+        font-size: 1.4rem;
+        opacity: 0.7;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        padding: 6px 10px;
+        flex-shrink: 0;
+        display: inline-block;
+        transition: opacity 0.2s ease;
+        line-height: 1;
+        touch-action: none;
+    }
+    .question-card-drag-handle:hover {
+        opacity: 1;
+        color: var(--primary-color);
+    }
+    .question-card-drag-handle:active {
+        cursor: grabbing;
+        opacity: 1;
+    }
+    .question-card.dragging {
+        opacity: 0.8;
+        transform: scale(1.02);
+    }
+    .question-card-header .question-card-actions {
+        pointer-events: auto;
+    }
+    .question-card-header .question-card-actions button {
+        cursor: pointer !important;
+        pointer-events: auto !important;
+        position: relative;
+        z-index: 10;
+    }
+    .question-card .question-card-body {
+        cursor: default;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .question-card input,
+    .question-card select,
+    .question-card textarea {
+        cursor: text !important;
+        pointer-events: auto !important;
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        -moz-user-select: text !important;
+        -ms-user-select: text !important;
+        touch-action: manipulation;
+        position: relative;
+        z-index: 10;
+    }
+    .question-card:not(.dragging) .question-card-body {
+        pointer-events: auto;
+    }
+    .question-card.dragging .question-card-body {
+        pointer-events: none;
+    }
+    .question-card.dragging input,
+    .question-card.dragging select,
+    .question-card.dragging textarea {
+        pointer-events: none;
+    }
+    .question-card button {
+        cursor: pointer;
+        pointer-events: auto !important;
+        user-select: none;
+    }
+    .question-card input:focus,
+    .question-card select:focus,
+    .question-card textarea:focus {
+        cursor: text;
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
+    }
+    .question-card.draggable-hint {
+        border-left: 4px solid var(--primary-color);
+    }
+    .question-card.sortable-ghost {
+        opacity: 0.3;
+        background: rgba(79, 70, 229, 0.05);
+        border: 2px dashed var(--primary-color);
+        transform: scale(0.95);
+        transition: all 0.2s ease;
+    }
+    .question-card.sortable-drag {
+        opacity: 0.95;
+        transform: scale(1.05) rotate(2deg);
+        box-shadow: 0 16px 40px rgba(79, 70, 229, 0.35);
+        border-color: var(--primary-color);
+        z-index: 1000;
+        transition: none;
+        cursor: grabbing !important;
+    }
+    .question-card.sortable-chosen {
+        border-color: var(--primary-color);
+        box-shadow: 0 8px 24px rgba(79, 70, 229, 0.3);
+        transform: scale(1.01);
+        background: rgba(79, 70, 229, 0.03);
+        transition: all 0.2s ease;
+        cursor: grabbing !important;
+    }
+    .question-card.dragging {
+        cursor: grabbing !important;
+        transition: none;
+    }
+    .question-card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .question-card-number {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: var(--primary-color);
+        font-size: 0.9rem;
+    }
+    .question-card-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .question-remove-btn {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border: 1.5px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .question-remove-btn:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: #dc2626;
+        transform: scale(1.05);
+    }
+    .question-card.editing {
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+    .question-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+    .settings-section {
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 2px solid rgba(148, 163, 184, 0.2);
+    }
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 768px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .settings-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px;
+        background: rgba(248, 250, 252, 0.8);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .settings-toggle:hover {
+        background: rgba(248, 250, 252, 1);
+        border-color: var(--primary-color);
+    }
+    .settings-toggle.active {
+        border-color: var(--primary-color);
+        background: rgba(79, 70, 229, 0.05);
+    }
+    .settings-content {
+        display: none;
+        margin-top: 20px;
+        padding: 20px;
+        background: rgba(248, 250, 252, 0.5);
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .settings-content.show {
+        display: block;
+    }
+    .settings-icon {
+        font-size: 1.2rem;
+        transition: transform 0.2s ease;
+    }
+    .settings-toggle.active .settings-icon {
+        transform: rotate(180deg);
+    }
+    .settings-icons-row {
+        display: flex;
+        gap: 20px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+    .setting-icon-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        min-width: 120px;
+    }
+    .setting-icon-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        background: white;
+        border: 2px solid rgba(148, 163, 184, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .setting-icon-btn:hover {
+        border-color: var(--primary-color);
+        background: rgba(79, 70, 229, 0.05);
+        transform: translateY(-2px);
+    }
+    .setting-icon-btn.active {
+        border-color: var(--primary-color);
+        background: rgba(79, 70, 229, 0.1);
+    }
+    .setting-icon-popup {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 8px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+        z-index: 1000;
+        display: none;
+    }
+    .setting-icon-popup.show {
+        display: block;
+    }
+    .setting-icon-item {
+        position: relative;
+    }
+    .add-column-plus {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        font-size: 1.5rem;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+        will-change: transform;
+    }
+    .add-column-plus:hover {
+        transform: scale(1.2) rotate(90deg);
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.5);
+    }
+    .add-column-plus:active {
+        transform: scale(1.1) rotate(90deg);
+        transition: all 0.1s ease;
+    }
+    .choice-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .choice-row {
+        display: flex;
+        gap: 8px;
+    }
+    .choice-row input[type="text"] {
+        flex: 1;
+    }
+    .remove-choice {
+        border: none;
+        background: rgba(148, 163, 184, 0.2);
+        color: #475569;
+        padding: 0 12px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .remove-choice:hover {
+        background: rgba(148, 163, 184, 0.35);
+    }
+    .remove-likert-choice {
+        width: 28px;
+        height: 28px;
+        border: none;
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 1.2rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .remove-likert-choice:hover {
+        background: rgba(239, 68, 68, 0.2);
+        transform: scale(1.1);
+    }
+    .likert-note {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 8px;
+    }
+</style>
+<script>
+    function toggleSectionDropdown() {
+        const menu = document.getElementById('section-dropdown-menu');
+        const toggle = document.querySelector('#section-dropdown .dropdown-toggle');
+        if (!menu || !toggle) return;
+        menu.classList.toggle('show');
+        toggle.classList.toggle('active');
+    }
+
+    function updateSectionDropdownText() {
+        const textElement = document.getElementById('section-dropdown-text');
+        if (!textElement) return;
+        const checked = document.querySelectorAll('#section-dropdown-menu input[name="assigned_sections"]:checked');
+        if (checked.length === 0) {
+            textElement.textContent = 'Select sections (leave empty for all)';
+            textElement.classList.add('placeholder');
+        } else if (checked.length === 1) {
+            textElement.textContent = checked[0].nextElementSibling.textContent.trim();
+            textElement.classList.remove('placeholder');
+        } else {
+            textElement.textContent = `${checked.length} sections selected`;
+            textElement.classList.remove('placeholder');
+        }
+        refreshSelectAllState();
+    }
+
+    function toggleSelectAllSections(source) {
+        const checkboxes = document.querySelectorAll('#section-dropdown-menu input[name="assigned_sections"]');
+        checkboxes.forEach(cb => (cb.checked = source.checked));
+        updateSectionDropdownText();
+    }
+
+    function refreshSelectAllState() {
+        const selectAll = document.getElementById('section-select-all');
+        if (!selectAll) return;
+        const checkboxes = document.querySelectorAll('#section-dropdown-menu input[name="assigned_sections"]');
+        const total = checkboxes.length;
+        const checked = Array.from(checkboxes).filter(cb => cb.checked).length;
+        selectAll.checked = total > 0 && checked === total;
+        selectAll.indeterminate = checked > 0 && checked < total;
+    }
+    
+    function toggleSettings() {
+        const toggle = document.getElementById('settings-toggle');
+        const content = document.getElementById('settings-content');
+        toggle.classList.toggle('active');
+        content.classList.toggle('show');
+    }
+    
+    function toggleSectionIconPopup() {
+        const popup = document.getElementById('section-popup');
+        const btn = document.getElementById('section-icon-btn');
+        const datePopup = document.getElementById('date-popup');
+        const dateBtn = document.getElementById('date-icon-btn');
+        
+        // Close date popup if open
+        if (datePopup.classList.contains('show')) {
+            datePopup.classList.remove('show');
+            dateBtn.classList.remove('active');
+        }
+        
+        popup.classList.toggle('show');
+        btn.classList.toggle('active');
+    }
+    
+    function toggleDateIconPopup() {
+        const popup = document.getElementById('date-popup');
+        const btn = document.getElementById('date-icon-btn');
+        const sectionPopup = document.getElementById('section-popup');
+        const sectionBtn = document.getElementById('section-icon-btn');
+        
+        // Close section popup if open
+        if (sectionPopup.classList.contains('show')) {
+            sectionPopup.classList.remove('show');
+            sectionBtn.classList.remove('active');
+        }
+        
+        popup.classList.toggle('show');
+        btn.classList.toggle('active');
+    }
+    
+    // Close popups when clicking outside
+    document.addEventListener('click', function(event) {
+        const sectionPopup = document.getElementById('section-popup');
+        const datePopup = document.getElementById('date-popup');
+        const sectionBtn = document.getElementById('section-icon-btn');
+        const dateBtn = document.getElementById('date-icon-btn');
+        
+        if (sectionPopup && !sectionPopup.contains(event.target) && !sectionBtn.contains(event.target)) {
+            sectionPopup.classList.remove('show');
+            sectionBtn.classList.remove('active');
+        }
+        
+        if (datePopup && !datePopup.contains(event.target) && !dateBtn.contains(event.target)) {
+            datePopup.classList.remove('show');
+            dateBtn.classList.remove('active');
+        }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const dropdown = document.getElementById('section-dropdown');
+        const menu = document.getElementById('section-dropdown-menu');
+        const toggle = document.querySelector('#section-dropdown .dropdown-toggle');
+        if (!dropdown || !menu || !toggle) return;
+        if (!dropdown.contains(event.target)) {
+            menu.classList.remove('show');
+            toggle.classList.remove('active');
+        }
+    });
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        updateSectionDropdownText();
+        refreshSelectAllState();
+        initQuestionBuilder();
+        
+        // Survey settings toggle
+        const surveySettingsToggle = document.getElementById('survey-settings-toggle');
+        const surveySettingsContent = document.getElementById('survey-settings-content');
+        if (surveySettingsToggle && surveySettingsContent) {
+            surveySettingsToggle.addEventListener('click', function() {
+                const isShowing = surveySettingsContent.style.display === 'block';
+                surveySettingsContent.style.display = isShowing ? 'none' : 'block';
+                surveySettingsToggle.classList.toggle('active');
+            });
+        }
+    });
+    
+    function initQuestionBuilder() {
+        const DEFAULT_LIKERT_COUNT = 5;
+        const questionsContainer = document.getElementById('questions-container');
+        const questionTemplate = document.getElementById('question-template');
+        const addQuestionBtn = document.getElementById('add-question-btn');
+        const surveyTypeSelect = document.getElementById('survey_type');
+        const questionsEmpty = document.getElementById('questions-empty');
+        const questionsAlert = document.getElementById('questions-alert');
+        const createSurveyForm = document.getElementById('create-survey-form');
+        let questionIndex = 0;
+        
+        const hideQuestionAlert = () => {
+            if (!questionsAlert) return;
+            questionsAlert.style.display = 'none';
+            questionsAlert.textContent = '';
+        };
+
+        const showQuestionAlert = (message) => {
+            if (!questionsAlert) return;
+            questionsAlert.textContent = message;
+            questionsAlert.style.display = 'block';
+        };
+
+        const updateEmptyState = () => {
+            if (questionsContainer && questionsEmpty) {
+                questionsEmpty.style.display = questionsContainer.children.length > 0 ? 'none' : 'block';
+            }
+        };
+
+        const attachRealtimeValidation = (card) => {
+            if (!card) return;
+            const liveFields = card.querySelectorAll('input, textarea, select');
+            liveFields.forEach(field => {
+                field.addEventListener('input', () => {
+                    card.classList.remove('error');
+                    hideQuestionAlert();
+                });
+                field.addEventListener('change', () => {
+                    card.classList.remove('error');
+                    hideQuestionAlert();
+                });
+            });
+        };
+
+        const validateQuestionsBeforeSubmit = () => {
+            if (!questionsContainer) return true;
+            const cards = Array.from(questionsContainer.querySelectorAll('.question-card'));
+            if (!cards.length) {
+                hideQuestionAlert();
+                return true;
+            }
+
+            let firstErrorMessage = '';
+            cards.forEach((card, index) => {
+                card.classList.remove('error');
+                const questionLabel = `Question ${index + 1}`;
+                const textInput = card.querySelector('input[name^="question_text_"]');
+                const typeSelect = card.querySelector('[data-question-type]');
+                const choiceList = card.querySelector('[data-choice-list]');
+
+                if (textInput && !textInput.value.trim()) {
+                    if (!firstErrorMessage) {
+                        firstErrorMessage = `${questionLabel} needs some text before you continue.`;
+                    }
+                    card.classList.add('error');
+                    return;
+                }
+
+                if (
+                    typeSelect &&
+                    ['mcq', 'likert'].includes(typeSelect.value) &&
+                    choiceList
+                ) {
+                    const choiceInputs = choiceList.querySelectorAll('input[type="text"]');
+                    const filledChoices = Array.from(choiceInputs).filter(input => input.value.trim().length);
+                    if (filledChoices.length < 2) {
+                        if (!firstErrorMessage) {
+                            firstErrorMessage = `${questionLabel} needs at least two answer choices.`;
+                        }
+                        card.classList.add('error');
+                    }
+                }
+            });
+
+            if (firstErrorMessage) {
+                showQuestionAlert(firstErrorMessage);
+                return false;
+            }
+
+            hideQuestionAlert();
+            return true;
+        };
+
+        if (questionsContainer) {
+            const existingCards = questionsContainer.querySelectorAll('.question-card');
+            existingCards.forEach(card => attachRealtimeValidation(card));
+        }
+
+        const updateQuestionNumbers = () => {
+            if (!questionsContainer) return;
+            const cards = questionsContainer.querySelectorAll('.question-card');
+            cards.forEach((card, index) => {
+                const numberDisplay = card.querySelector('.question-number-display');
+                if (numberDisplay) {
+                    numberDisplay.textContent = index + 1;
+                }
+            });
+        };
+
+        const addQuestion = (options = {}) => {
+            if (!questionsContainer || !questionTemplate) return null;
+            const idx = questionIndex++;
+            const html = questionTemplate.innerHTML.replace(/__index__/g, idx);
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html.trim();
+            const card = wrapper.firstElementChild;
+            questionsContainer.appendChild(card);
+            attachRealtimeValidation(card);
+            updateEmptyState();
+
+            const typeSelect = card.querySelector('[data-question-type]');
+            const choiceSection = card.querySelector('[data-choice-section]');
+            const addChoiceBtn = card.querySelector('[data-add-choice]');
+            const choiceList = card.querySelector('[data-choice-list]');
+            const removeBtn = card.querySelector('[data-remove-btn]') || card.querySelector('[data-remove-question]');
+            const likertHint = card.querySelector('[data-likert-hint]');
+
+            // Auto-set question type based on survey type if not explicitly provided
+            if (!options.questionType && surveyTypeSelect) {
+                const surveyType = surveyTypeSelect.value;
+                // Map survey types to question types
+                if (surveyType === 'likert') {
+                    options.questionType = 'likert';
+                } else if (surveyType === 'multiple_choice') {
+                    options.questionType = 'mcq';
+                } else if (surveyType === 'short_answer') {
+                    options.questionType = 'text';
+                } else {
+                    // Default to text for other survey types or when no type is selected
+                    options.questionType = 'text';
+                }
+            }
+
+            if (options.questionType) {
+                typeSelect.value = options.questionType;
+            }
+
+            // Trigger the change event to set up the choice section properly
+            typeSelect.addEventListener('change', () =>
+                toggleChoiceSection({ typeSelect, choiceSection, choiceList, addChoiceBtn, likertHint })
+            );
+            
+            // If question type was auto-set, trigger the toggle immediately
+            if (options.questionType) {
+                toggleChoiceSection({ typeSelect, choiceSection, choiceList, addChoiceBtn, likertHint });
+            }
+            addChoiceBtn.addEventListener('click', () => addChoiceInput(choiceList));
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    card.remove();
+                    updateEmptyState();
+                    updateQuestionNumbers();
+                });
+            }
+
+            toggleChoiceSection({ typeSelect, choiceSection, choiceList, addChoiceBtn, likertHint });
+            updateQuestionNumbers();
+            
+            // Reinitialize Sortable to ensure new elements are draggable
+            // Use setTimeout to ensure DOM is fully updated
+            setTimeout(() => {
+                if (questionsContainer && !questionsContainer.sortableInstance) {
+                    initQuestionSortable();
+                }
+            }, 0);
+            
+            return card;
+        };
+
+        const toggleChoiceSection = ({ typeSelect, choiceSection, choiceList, addChoiceBtn, likertHint }) => {
+            if (!typeSelect || !choiceSection) return;
+            const isMCQ = typeSelect.value === 'mcq';
+            const isLikert = typeSelect.value === 'likert';
+            const needsChoices = isMCQ || isLikert;
+            choiceSection.style.display = needsChoices ? 'block' : 'none';
+            
+            if (needsChoices) {
+                if (isLikert) {
+                    // If switching to Likert, replace existing choices with Likert format
+                    const existingRows = choiceList.querySelectorAll('.choice-row');
+                    const hasLikertButtons = existingRows.length > 0 && existingRows[0].querySelector('.remove-likert-choice');
+                    
+                    if (!hasLikertButtons || existingRows.length < DEFAULT_LIKERT_COUNT) {
+                        renderLikertChoices(choiceList);
+                    }
+                } else if (isMCQ) {
+                    // If switching to MCQ and no choices exist, add MCQ choices
+                    if (choiceList.children.length === 0) {
+                        addChoiceInput(choiceList);
+                        addChoiceInput(choiceList);
+                    }
+                    // Remove Likert-style remove buttons if switching from Likert
+                    const likertButtons = choiceList.querySelectorAll('.remove-likert-choice');
+                    likertButtons.forEach(btn => {
+                        const row = btn.closest('.choice-row');
+                        if (row) {
+                            btn.remove();
+                            const removeBtn = document.createElement('button');
+                            removeBtn.type = 'button';
+                            removeBtn.className = 'remove-choice';
+                            removeBtn.textContent = '×';
+                            removeBtn.title = 'Remove this choice';
+                            removeBtn.style.cssText = 'width: 32px; height: 32px; border: none; background: rgba(239, 68, 68, 0.1); color: #dc2626; border-radius: 6px; cursor: pointer; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; line-height: 1; flex-shrink: 0;';
+                            removeBtn.addEventListener('mouseenter', function() {
+                                this.style.background = 'rgba(239, 68, 68, 0.2)';
+                                this.style.transform = 'scale(1.1)';
+                            });
+                            removeBtn.addEventListener('mouseleave', function() {
+                                this.style.background = 'rgba(239, 68, 68, 0.1)';
+                                this.style.transform = 'scale(1)';
+                            });
+                            removeBtn.addEventListener('click', () => {
+                                const allRows = choiceList.querySelectorAll('.choice-row');
+                                if (allRows.length > 1) {
+                                    row.remove();
+                                }
+                            });
+                            row.appendChild(removeBtn);
+                        }
+                    });
+                }
+            } else {
+                choiceList.innerHTML = '';
+            }
+            
+            if (addChoiceBtn) {
+                addChoiceBtn.style.display = isMCQ ? 'block' : 'none';
+            }
+            if (likertHint) {
+                likertHint.style.display = isLikert ? 'block' : 'none';
+            }
+        };
+
+        const addChoiceInput = (listEl) => {
+            if (!listEl) return;
+            const row = document.createElement('div');
+            row.className = 'choice-row';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = listEl.dataset.choiceName;
+            input.placeholder = 'Choice text';
+            
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'remove-choice';
+            removeButton.textContent = '×';
+            removeButton.title = 'Remove this choice';
+            removeButton.style.cssText = 'width: 32px; height: 32px; border: none; background: rgba(239, 68, 68, 0.1); color: #dc2626; border-radius: 6px; cursor: pointer; font-size: 1.2rem; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; line-height: 1; flex-shrink: 0;';
+            removeButton.addEventListener('mouseenter', function() {
+                this.style.background = 'rgba(239, 68, 68, 0.2)';
+                this.style.transform = 'scale(1.1)';
+            });
+            removeButton.addEventListener('mouseleave', function() {
+                this.style.background = 'rgba(239, 68, 68, 0.1)';
+                this.style.transform = 'scale(1)';
+            });
+            removeButton.addEventListener('click', () => row.remove());
+            
+            row.appendChild(input);
+            row.appendChild(removeButton);
+            listEl.appendChild(row);
+        };
+
+        const renderLikertChoices = (listEl) => {
+            if (!listEl) return;
+            const currentChoices = listEl.querySelectorAll('.choice-row');
+            const currentCount = currentChoices.length;
+            
+            // If already has choices, don't reset - just ensure minimum
+            if (currentCount > 0 && currentCount >= DEFAULT_LIKERT_COUNT) {
+                return;
+            }
+            
+            // Clear and rebuild if needed
+            if (currentCount < DEFAULT_LIKERT_COUNT) {
+                listEl.innerHTML = '';
+                for (let i = 0; i < DEFAULT_LIKERT_COUNT; i++) {
+                    addLikertChoiceInput(listEl, i + 1);
+                }
+            }
+        };
+        
+        const addLikertChoiceInput = (listEl, index) => {
+            const row = document.createElement('div');
+            row.className = 'choice-row';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = listEl.dataset.choiceName;
+            input.placeholder = `Scale label ${index}`;
+            input.style.flex = '1';
+            
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'remove-likert-choice';
+            removeButton.textContent = '×';
+            removeButton.title = 'Remove this scale label';
+            removeButton.addEventListener('click', () => {
+                const allRows = listEl.querySelectorAll('.choice-row');
+                // Keep at least 2 choices
+                if (allRows.length > 2) {
+                    row.remove();
+                } else {
+                    alert('Likert scale must have at least 2 options');
+                }
+            });
+            
+            row.appendChild(input);
+            row.appendChild(removeButton);
+            listEl.appendChild(row);
+        };
+        
+        if (addQuestionBtn) {
+            addQuestionBtn.addEventListener('click', () => {
+                // Get current survey type and auto-set question type
+                addQuestion();
+            });
+        }
+
+        function initQuestionSortable() {
+            if (!questionsContainer) return;
+            
+            // Destroy existing instance if it exists
+            if (questionsContainer.sortableInstance) {
+                questionsContainer.sortableInstance.destroy();
+                questionsContainer.sortableInstance = null;
+            }
+            
+            questionsContainer.sortableInstance = new Sortable(questionsContainer, {
+                animation: 200,
+                ghostClass: 'sortable-ghost',
+                dragClass: 'sortable-drag',
+                chosenClass: 'sortable-chosen',
+                handle: '.question-card-drag-handle',
+                draggable: '.question-card',
+                swapThreshold: 0.65,
+                invertSwap: true,
+                direction: 'auto',
+                forceFallback: false,
+                scroll: true,
+                scrollSensitivity: 100,
+                scrollSpeed: 20,
+                onStart: function(evt) {
+                    evt.item.classList.add('dragging');
+                    evt.item.style.zIndex = '1000';
+                    // Prevent dragging into survey info area
+                    const surveyInfo = document.querySelector('.survey-info-wrapper');
+                    if (surveyInfo) {
+                        surveyInfo.style.pointerEvents = 'none';
+                        surveyInfo.style.userSelect = 'none';
+                    }
+                },
+                onEnd: function(evt) {
+                    evt.item.classList.remove('dragging');
+                    evt.item.style.zIndex = '';
+                    // Restore survey info area
+                    const surveyInfo = document.querySelector('.survey-info-wrapper');
+                    if (surveyInfo) {
+                        surveyInfo.style.pointerEvents = '';
+                        surveyInfo.style.userSelect = '';
+                    }
+                    // Update question numbers after reordering
+                    updateQuestionNumbers();
+                },
+                onUpdate: function(evt) {
+                    // This fires when the order changes
+                    updateQuestionNumbers();
+                }
+            });
+        }
+
+        if (questionsContainer) {
+            // Initialize question drag and drop
+            initQuestionSortable();
+            updateEmptyState();
+        }
+
+        if (createSurveyForm) {
+            createSurveyForm.addEventListener('submit', function(event) {
+                if (!validateQuestionsBeforeSubmit()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (questionsAlert) {
+                        questionsAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            });
+        }
+
+        const updateAllQuestionsToMatchSurveyType = (surveyType) => {
+            // Map survey types to question types
+            let targetQuestionType = 'text'; // default
+            if (surveyType === 'likert') {
+                targetQuestionType = 'likert';
+            } else if (surveyType === 'multiple_choice') {
+                targetQuestionType = 'mcq';
+            } else if (surveyType === 'short_answer') {
+                targetQuestionType = 'text';
+            }
+            
+            // Update all existing question forms to match the survey type
+            const cards = questionsContainer.querySelectorAll('.question-card');
+            cards.forEach(card => {
+                const typeSelect = card.querySelector('[data-question-type]');
+                if (typeSelect && typeSelect.value !== targetQuestionType) {
+                    typeSelect.value = targetQuestionType;
+                    const choiceSection = card.querySelector('[data-choice-section]');
+                    const choiceList = card.querySelector('[data-choice-list]');
+                    const addChoiceBtn = card.querySelector('[data-add-choice]');
+                    const likertHint = card.querySelector('[data-likert-hint]');
+                    toggleChoiceSection({ typeSelect, choiceSection, choiceList, addChoiceBtn, likertHint });
+                }
+            });
+        };
+
+        const applySurveyTypeRules = () => {
+            if (!surveyTypeSelect) return;
+            const currentValue = surveyTypeSelect.value;
+            const surveyTypeHint = document.getElementById('survey-type-hint');
+            
+            // Show/hide hint based on survey type selection
+            if (surveyTypeHint) {
+                if (currentValue && currentValue !== '') {
+                    surveyTypeHint.style.display = 'inline';
+                } else {
+                    surveyTypeHint.style.display = 'none';
+                }
+            }
+            
+            // Update all existing questions to match the new survey type
+            if (currentValue && currentValue !== '') {
+                updateAllQuestionsToMatchSurveyType(currentValue);
+            }
+        };
+
+        if (surveyTypeSelect) {
+            surveyTypeSelect.addEventListener('change', applySurveyTypeRules);
+            applySurveyTypeRules();
+        }
+    }
+</script>
+{% endblock %}
+
+{% block sidebar_nav %}
+    <a class="sidebar-link" href="{% url 'teacher_dashboard' %}?section=overview">
+        {% include 'my_app/partials/nav_icon.html' with name='home' %}
+        <span class="nav-label">Overview</span>
+    </a>
+    <a class="sidebar-link" href="{% url 'teacher_dashboard' %}?section=manage">
+        {% include 'my_app/partials/nav_icon.html' with name='clipboard' %}
+        <span class="nav-label">Manage Surveys</span>
+    </a>
+{% endblock %}
+
+{% block topbar_actions %}
+    <span class="badge">
+        {{ user.get_full_name|default:user.username }}
+    </span>
+{% endblock %}
+
+{% block page_title %}Create New Survey{% endblock %}
+
+{% block content %}
+    <div class="card">
+        {% if error %}
+            <div class="error" style="background: #fee2e2; color: #991b1b; padding: 16px; border-radius: 12px; margin-bottom: 24px; border: 1px solid #fecaca;">
+                {{ error }}
+            </div>
+        {% endif %}
+
+        <form id="create-survey-form" method="POST">
+            {% csrf_token %}
+
+            <div class="survey-form-layout">
+            <div class="survey-info-wrapper">
+            <div class="question-card" style="margin-bottom: 24px; background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(124, 58, 237, 0.05) 100%); border-color: var(--primary-color);">
+                <div class="question-card-header">
+                    <div class="question-card-number" style="font-size: 1rem;">📋 Survey Information</div>
+                    <button type="button" class="question-settings-toggle" id="survey-settings-toggle" style="background: rgba(79, 70, 229, 0.08); color: var(--primary-color); border: 1.5px solid rgba(79, 70, 229, 0.2); border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">⚙️ Settings</button>
+                </div>
+                <div class="question-card-body">
+                    <div class="form-group">
+                        <label for="title">Survey Title *</label>
+                        <input type="text" id="title" name="title" required placeholder="e.g., Customer Feedback Survey" value="{{ form_data.title|default:'' }}">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" placeholder="Brief description of the survey..." rows="3">{{ form_data.description|default:'' }}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="survey_type">Survey Type *</label>
+                        <select id="survey_type" name="survey_type" required>
+                            <option value="">Select a survey type</option>
+                            {% for survey_type_value, survey_type_label in survey_types %}
+                                <option value="{{ survey_type_value }}" {% if form_data.survey_type|default:'' == survey_type_value %}selected{% endif %}>{{ survey_type_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="question-settings-content" id="survey-settings-content" style="display: none; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;" class="settings-grid">
+                            <div class="form-group">
+                                <label for="due_date">Due Date (Optional)</label>
+                                <input type="date" id="due_date" name="due_date" value="{{ form_data.due_date|default:'' }}" style="width: 100%; padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.4);">
+                                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 6px;">Set a deadline for survey responses</p>
+                            </div>
+                            <div class="form-group" style="z-index: 50;">
+                                <label for="section-dropdown">Assign Sections (Optional)</label>
+                                <div class="custom-dropdown" id="section-dropdown">
+                                    <button type="button" class="dropdown-toggle" onclick="toggleSectionDropdown()">
+                                        <span class="dropdown-text placeholder" id="section-dropdown-text">Select sections (leave empty for all)</span>
+                                        <span class="dropdown-arrow">▼</span>
+                                    </button>
+                                    <div class="dropdown-menu" id="section-dropdown-menu">
+                                        <label class="dropdown-option" style="font-weight: 600;">
+                                            <input type="checkbox" id="section-select-all" onchange="toggleSelectAllSections(this)">
+                                            <span>Select all</span>
+                                        </label>
+                                        {% for section in sections %}
+                                            <label class="dropdown-option">
+                                                <input type="checkbox" name="assigned_sections" value="{{ section.id }}"
+                                                    {% if form_data.assigned_sections and section.id|stringformat:'s' in form_data.assigned_sections %}checked{% endif %}
+                                                    onchange="updateSectionDropdownText()">
+                                                <span>{{ section.name }}</span>
+                                            </label>
+                                        {% endfor %}
+                                        {% if not sections %}
+                                            <div style="padding: 12px; color: #dc2626; font-size: 0.85rem;">No sections available. Add sections in Django admin before creating surveys.</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 6px;">Leave empty to assign to all sections</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <div class="questions-builder" style="background: rgba(248, 250, 252, 0.5); padding: 20px; border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.2);">
+                <div class="questions-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <div>
+                        <label style="font-size: 1.1rem; font-weight: 600;">Questions</label>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+                            Add questions to your survey. <strong style="color: var(--primary-color);">Drag and drop</strong> any question card to reorder. Use × to remove.
+                            <span id="survey-type-hint" style="display: none; color: var(--primary-color); font-weight: 500;">New questions will automatically match the selected survey type.</span>
+                        </p>
+                    </div>
+                    <button type="button" class="add-column-plus" id="add-question-btn" title="Add Question">+</button>
+                </div>
+                <div id="questions-alert" class="form-alert"></div>
+                <div id="questions-container" class="questions-list"></div>
+                <div id="questions-empty" class="empty-state" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <div style="font-size: 2rem; margin-bottom: 12px;">📝</div>
+                    <div style="font-weight: 500; margin-bottom: 8px;">No questions yet</div>
+                    <div style="font-size: 0.9rem;">Click the <strong style="color: var(--primary-color);">+</strong> button above to add your first question</div>
+                </div>
+            </div>
+            </div>
+
+            <template id="question-template">
+                <div class="question-card" data-question-index="__index__">
+                    <input type="hidden" name="question_indexes" value="__index__">
+                    <div class="question-card-header">
+                        <span class="question-card-drag-handle" style="display: inline-block;">☰</span>
+                        <div class="question-card-number">Question <span class="question-number-display">1</span></div>
+                        <div class="question-card-actions" style="margin-left: auto;">
+                            <button type="button" class="question-remove-btn" data-remove-btn style="background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1.5px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 6px 12px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">×</button>
+                        </div>
+                    </div>
+                    <div class="question-card-body">
+                        <div class="form-group">
+                            <label for="question_text___index__">Question *</label>
+                            <input type="text" id="question_text___index__" name="question_text___index__" placeholder="Enter your question here...">
+                        </div>
+                        <div class="form-group">
+                            <label for="question_type___index__">Question Type *</label>
+                            <select id="question_type___index__" name="question_type___index__" data-question-type>
+                                {% for value, label in question_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="question_required___index__" name="question_required___index__" checked>
+                            <label for="question_required___index__" style="margin: 0;">Required to answer</label>
+                        </div>
+                        <div class="form-group" data-choice-section>
+                            <label>Choices</label>
+                            <div class="choice-list" data-choice-list data-choice-name="choice___index__[]"></div>
+                            <button type="button" class="btn-secondary" data-add-choice style="width: 100%; margin-top: 8px;">+ Add Choice</button>
+                            <p class="likert-note" data-likert-hint style="display: none; margin-top: 8px; font-size: 0.85rem; color: var(--text-muted);">
+                                Provide custom labels for each point in the Likert scale.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Create Survey</button>
+                <a href="{% url 'teacher_dashboard' %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

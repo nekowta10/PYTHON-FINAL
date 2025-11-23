@@ -1,0 +1,50 @@
+{% comment %}Reusable SVG icon snippet for sidebar navigation{% endcomment %}
+<span class="nav-icon" aria-hidden="true">
+    {% if name == 'home' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <path d="M4 10.5 12 4l8 6.5" />
+            <path d="M6.5 9V19a1 1 0 0 0 1 1H11v-5h2v5h3.5a1 1 0 0 0 1-1V9" />
+        </svg>
+    {% elif name == 'clipboard' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <rect x="7" y="4" width="10" height="16" rx="2" />
+            <path d="M9 3h6" />
+            <path d="M10 10h4" />
+            <path d="M10 14h4" />
+        </svg>
+    {% elif name == 'users' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <circle cx="12" cy="9" r="3.2" />
+            <path d="M6 19.5c0-3.5 2.7-6.5 6-6.5s6 3 6 6.5" />
+            <path d="M5.2 10a3 3 0 0 1 2.3-3.2" />
+            <path d="M18.8 10a3 3 0 0 0-2.3-3.2" />
+        </svg>
+    {% elif name == 'clock' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <circle cx="12" cy="12" r="7.5" />
+            <path d="M12 8v4l2.8 2" />
+        </svg>
+    {% elif name == 'check' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <circle cx="12" cy="12" r="7.5" />
+            <path d="m8.8 12.3 2.1 2.2 4.3-4.3" />
+        </svg>
+    {% elif name == 'history' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <path d="M8 3h7l4 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+            <path d="M15 3v4h4" />
+            <path d="M9.5 13h5" />
+            <path d="M9.5 17h3.5" />
+        </svg>
+    {% elif name == 'edit' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <path d="M4 17.5V20h2.5L19 7.5a1.8 1.8 0 0 0-2.5-2.5L4 17.5z" />
+            <path d="M14.5 6.5l3 3" />
+        </svg>
+    {% else %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="presentation">
+            <circle cx="12" cy="12" r="7.5" />
+        </svg>
+    {% endif %}
+</span>
+

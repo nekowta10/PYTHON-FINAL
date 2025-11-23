@@ -1,0 +1,65 @@
+{% extends 'my_app/base_dashboard.html' %}
+
+{% block title %}Enrolled Students · Survey Hub{% endblock %}
+
+{% block sidebar_nav %}
+    <a class="sidebar-link" href="{% url 'teacher_dashboard' %}?section=overview">
+        {% include 'my_app/partials/nav_icon.html' with name='home' %}
+        <span class="nav-label">Overview</span>
+    </a>
+    <a class="sidebar-link" href="{% url 'teacher_dashboard' %}?section=manage">
+        {% include 'my_app/partials/nav_icon.html' with name='clipboard' %}
+        <span class="nav-label">Manage Surveys</span>
+    </a>
+    <a class="sidebar-link active" href="{% url 'all_users' %}">
+        {% include 'my_app/partials/nav_icon.html' with name='users' %}
+        <span class="nav-label">Students</span>
+    </a>
+{% endblock %}
+
+{% block page_title %}
+    Enrolled Students
+    <small>Every student account currently active in the system.</small>
+{% endblock %}
+
+{% block topbar_actions %}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-header">
+            Students
+        </div>
+
+        {% if students %}
+            <div class="list">
+                {% for student_data in students %}
+                    <div class="list-item">
+                        <div>
+                            <h4>{{ student_data.user.get_full_name|default:student_data.user.username }}</h4>
+                            <p>
+                                <strong>Username:</strong> {{ student_data.user.username }}
+                                {% if student_data.email %}
+                                    · <strong>Email:</strong> {{ student_data.email }}
+                                {% endif %}
+                            </p>
+                            <p class="muted">
+                                Joined: {{ student_data.date_joined|date:"M d, Y" }}
+                                {% if student_data.section %}
+                                    · Section: <strong>{{ student_data.section.name }}</strong>
+                                {% else %}
+                                    · <span style="color: #dc2626;">No section assigned</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <span class="badge success">Student</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                No students found in the system.
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
